@@ -1,235 +1,194 @@
 (function(){
 
-    'use strict;'
+	'use strict;'
 
-    // Step 1 - Initialize Map
+	// Step 1 - Initialize Map
 
-    // GLOBALS
+	// GLOBALS
     // H (from HERE API)
     // M manage common objects and settings
       
-    let M = {
-       'Init' : {    // developer.here.com for app_id and app_code
-         'app_id':   ' YOUR APP_ID ',
-         'app_code': ' YOUR APP_CODE ',
-         useHTTPS: true
-       },
-       'Behavior' :    {},       // Управление событиями карты
-       'Container' :   {},       // Контейнер для отображения карты
-       'PlacesService':{},       // Сервис Places API
-       'PlacesGroup':  {},       // Группа для хранения точек интереса
-       'Lat' :         55.751,   // Широта (центр карты)
-       'Lng' :         37.620,   // Долгота (центр карты)
-       'Layers' :      {},       // Список картографических основ
-       'Map' :         {},       // Объект карты
-       'Platform' :    {},       // Платформа HERE API
-       'UI' :          {},       // Пользовательский интерфейс
-       'Zoom' :        12        // 1 == весь мир, 15 == масштаб улицы
-    };
+	let M = {
+	    'Init' : { // developer.here.com for app_id and app_code
+	      'app_id':   'SRDnjFXg1EUdjJNVu9xN',
+	      'app_code': 'BDyd-r-8dYkniAe-fQKrOw',
+	      useHTTPS: true
+	    },
+	    'Behavior' :    {},         // Manage map behaviors
+	    'Container' :   {},         // Reference to DOM object containing map
+	    'PlacesService' :      {},  // Geocoder service
+	    'PlacesGroup': 	{},			// Group for markers
+	    'Lat' :         55.751,     // Latitude
+	    'Lng' :         37.620,     // Longitude
+	    'Layers' :      {},         // Map layers
+	    'Map' :         {},         // Map object
+	    'Platform' :    {},         // Core to HERE API
+	    'UI' :          {},         // User interface and interaction
+	    'Zoom' :        12          // 1 == global, 15 == street level
+	};
+	
+	// Obtain reference to #map in DOM 
+	M.Container = document.querySelector('#map');
+	  
+	// Store initialized platform object
+	M.Platform = new H.service.Platform(M.Init)
+	  
+	// Store reference to places service
+	M.PlacesService = M.Platform.getPlacesService()
 
+	// Store places markers in group
+	M.PlacesGroup = new H.map.Group()
+	  
+	// Store reference to layers object
+	M.Layers = M.Platform.createDefaultLayers({lg:'rus'})
 
-    // Контейнер для отображения карты 
-    M.Container = document.querySelector('#map');
-      
-    // Инициализация платформы
-    M.Platform = new H.service.Platform(M.Init)
-      
-    // Получение доступа к сервису Places API
-    M.PlacesService = M.Platform.getPlacesService()
+	// Create map object initialized with container and style
+	// Set map style - example M.Layers.satellite.map
+	M.Map = new H.Map(M.Container, M.Layers.normal.map);
+	  
+	// Create behavior object initialized with map object
+	M.Behavior = new H.mapevents.Behavior(new H.mapevents.MapEvents(M.Map))
+	  
+	// Store UI object associated with map object and layers object
+	M.UI = H.ui.UI.createDefault(M.Map, M.Layers)
 
-    // Создание группы для хранения результатов запроса Places API
-    M.PlacesGroup = new H.map.Group()
-      
-    // Список картографических основ
-    M.Layers = M.Platform.createDefaultLayers({lg:'rus'})
+	window.addEventListener('resize', () => {
+		M.Map.getViewPort().resize()
+	})
 
-    // Создание объекта карты 
-    M.Map = new H.Map(M.Container, M.Layers.normal.map);
-      
-    // Добавление интерактивности
-    M.Behavior = new H.mapevents.Behavior(new H.mapevents.MapEvents(M.Map))
-      
-    // Пользовательский интерфейс
-    M.UI = H.ui.UI.createDefault(M.Map, M.Layers)
-
-    // Обработчик изменения размеров окна браузера
-    window.addEventListener('resize', () => {
-      M.Map.getViewPort().resize()
-    })
-
-    // Функция для отображения карты
-    function displayMap () {
-        
-        // Центр карты
-        M.Map.setCenter({lat: M.Lat, lng: M.Lng})
-        
-        // Масштаб 2 - весь мир, 17 - уровень улицы
+	function displayMap () {
+		M.Map.setCenter({lat: M.Lat, lng: M.Lng})
         M.Map.setZoom(M.Zoom)
-
-        // Группа для хранения маркеров
         M.Map.addObject(M.PlacesGroup)
-    }
+	}
 
-    // Вызов функции для инициализации карты
-    displayMap()
-
-    // Step 2 - Calculations
-
-    let C = {
-       // Перевод шагов в метры
-       CvtStepsToMeters: steps => steps * 0.762,
-       // Перевод метров в шаги
-       CvtMetersToSteps: meters => meters / 0.762,
-       // Функция для создания маркеров
-       CreateMarker: (coords, options=null) => new H.map.Marker({ lat: coords.lat, lng: coords.lng }, options),
-    }
+	displayMap()
 
 
-    let P = {
-       'Latitude': 55.751,
-       'Longitude': 37.620,
-       'Category': 'sights-museums',       // Категория поиска
-       'Radius': C.CvtStepsToMeters(2500), // Радиус поиска в метрах
-       'ShowPlaces': {}      // Функция для выполнения поискового запроса
-    }
 
+	// Step 2 - Calculations
 
-    P.ShowPlaces = () => {
-        
-        /* 
-          Объект содержащий параметры запроса. Подробнее можно ознакомиться 
-          на портале для разработчиков - https://developer.here.com в разделе Places API
-        */
-        let explore = {
-            'in': `${P.Latitude},${P.Longitude};r=${P.Radius}`,
-            'cat': P.Category
-        }
+	let C = {
+		CvtStepsToMeters: steps => steps * 0.762,
+		CvtMetersToSteps: meters => meters / 0.762,
+		CreateMarker: (coords, options=null) => new H.map.Marker({ lat: coords.lat, lng: coords.lng }, options),
+	}
 
-        // Асинхронный запрос к сервису Places API
-        M.PlacesService.explore(
-            explore,                    // параметры запроса
-            result => onResult(result), // обработчик успешного ответа сервера
-            error => onError(error)     // обработчик ошибки
-        )
+	// Step 3 - Places
+	let P = {
+		'Latitude': 55.751,
+		'Longitude': 37.620,
+		'Category': 'sights-museums',
+		'Radius': C.CvtStepsToMeters(2500),
+		'ShowPlaces': {}
+	}
 
-        let onResult = result => {
-            // Выводим в консоль результат запроса
-            console.log(result)
-         
-            // Маркер с координатами местоположения пользователя
-            let startPoint = C.CreateMarker({ lat: P.Latitude, lng: P.Longitude }, {})
-            
-            // Очищаем группу с маркерами
-            M.PlacesGroup.removeObjects(M.PlacesGroup.getObjects())
-            
-            // Обработка массива объектов
-            result.results.items.forEach( point => {
-                
-                // Создание маркета для текущего объекта
-                let endPoint = C.CreateMarker({ lat: point.position[0], lng: point.position[1]}, {icon: new H.map.Icon(point.icon)})
-                
-                // Вычисление расстояния в метрах от местоположения пользователя до объекта поиска
-                let distance = startPoint.getPosition().distance(endPoint.getPosition())
-                
-                /* 
-                  Сохранение информации о названии текущего объекта
-                  и количестве шагов до него.
-                  Добавление вывода информации по клику.
-                */
-                endPoint.setData({ 'distance': C.CvtMetersToSteps(distance), 'name': point.title}).addEventListener('tap', e => {
-                    alert("Название: " + e.target.getData().name + "\n" +"Количество шагов: " + e.target.getData().distance.toFixed(0))
-                })
+	P.ShowPlaces = () => {
 
-                // Добавление объекта в группу
-                M.PlacesGroup.addObject(endPoint)
-            
-                // Масштабирование карты по выборке
-                M.Map.setViewBounds(M.PlacesGroup.getBounds())
-            })
-            
-        }
-      
-        // При возникновении ошибки информация будет отображена в консоли
-        let onError = error => console.log(error)
+		let explore = {
+			'in': `${P.Latitude},${P.Longitude};r=${P.Radius}`,
+		    'cat': P.Category
+		}
 
-    }
+		M.PlacesService.explore(
+	  		explore, 
+	  		result => onResult(result), 
+	  		error => onError(error)
+	  	)
 
+	  	let onResult = result => {
+	  		console.log(result)
 
-    let G = {
-        'StartTrackPosition': {},  // Функция отслеживания местоположения
-        'ShowPosition': {},        // Функция отображения местоположения пользователя на карте
-        'ShowError': {},           // Обработчик ошибки - например пользователь не дал доступ к трекингу геолокации 
-        'CurrentPosition': {},     // Координаты текущего местоположения
-        'LocationMarker':{},       // Маркер с текущим местоположением
-    }
+	  		let startPoint = C.CreateMarker({ lat: P.Latitude, lng: P.Longitude }, {})
+	  		
+	  		M.PlacesGroup.removeObjects(M.PlacesGroup.getObjects())
 
-    G.StartTrackPosition = () => {
-        // Проверка поддержки браузером Geolocation API
-        if (navigator.geolocation) {
-            // Начать трекинг местоположения
-            navigator.geolocation.watchPosition(G.ShowPosition, G.ShowError)
-        } else {
-            // Вывод в консоль сообщения об ошибке
-            console.log("Geolocation is not supported by this browser.")
-        }
-    }
+	  		result.results.items.forEach( point => {
 
-    G.ShowPosition = position => {
-        // Сохранение координат текущего местоположения
-        G.CurrentPosition = { 
-            lat: position.coords.latitude, 
-            lng: position.coords.longitude 
-        }
-        
-        // Обновление центра карты
-        M.Map.setCenter(G.CurrentPosition)
-        
-        // Если объект маркера уже существует, обновляем значение координат на текущее
-        if (G.LocationMarker instanceof H.map.Marker) {
-            G.LocationMarker.setPosition(G.CurrentPosition)
-        } else {
-            G.LocationMarker = C.CreateMarker(G.CurrentPosition, {})
-            M.Map.addObject(G.LocationMarker)
-        }       
-    }
+	  			let endPoint = C.CreateMarker({ lat: point.position[0], lng: point.position[1]}, {icon: new H.map.Icon(point.icon)})
+	  			
+	  			let distance = startPoint.getPosition().distance(endPoint.getPosition())
+	  			
+	  			endPoint.setData({ 'distance': C.CvtMetersToSteps(distance), 'name': point.title}).addEventListener('tap', e => {
+	  				alert("Название: " + e.target.getData().name + "\n" +"Количество шагов: " + e.target.getData().distance.toFixed(0))
+	  			})
 
-    // Обработка ошибок
-    G.ShowError = error =>{
-        switch(error.code) {
-            case error.PERMISSION_DENIED:
-              alert("User denied the request for Geolocation.")
-              break
-            case error.POSITION_UNAVAILABLE:
-              alert("Location information is unavailable.")
-              break
-            case error.TIMEOUT:
-              alert("The request to get user location timed out.")
-              break
-            case error.UNKNOWN_ERROR:
-              alert("An unknown error occurred.")
-              break
-        }
-    }
+	  			M.PlacesGroup.addObject(endPoint)
+	  			M.Map.setViewBounds(M.PlacesGroup.getBounds())
+	  		})
+	  		
+	  	}
 
-    // Запуск трекинга местоположения
-    G.StartTrackPosition()
+	  	let onError = error => console.log(error)
+	}
 
+	// Step 4 - Geolocation
+	let G = {
+		'StartTrackPosition': {},
+		'ShowPosition': {},
+		'ShowError': {},
+		'CurrentPosition': {},
+		'LocationMarker':{},
+	}
 
-    document.querySelector('#search').addEventListener('click', e => {
+	G.StartTrackPosition = () => {
+		if (navigator.geolocation) {
+			navigator.geolocation.watchPosition(G.ShowPosition, G.ShowError)
+		} else {
+			console.log("Geolocation is not supported by this browser.")
+		}
+	}
 
-        if(document.querySelector("#steps").value != ''){
+	G.ShowPosition = position => {
+		// debugger;
+		G.CurrentPosition = { 
+			lat: position.coords.latitude, 
+			lng: position.coords.longitude 
+		}
+
+		M.Map.setCenter(G.CurrentPosition)
+
+		if (G.LocationMarker instanceof H.map.Marker) {
+			G.LocationMarker.setPosition(G.CurrentPosition)
+		} else {
+			G.LocationMarker = C.CreateMarker(G.CurrentPosition, {})
+			M.Map.addObject(G.LocationMarker)
+		}		
+	}
+
+	G.ShowError = error =>{
+		switch(error.code) {
+		    case error.PERMISSION_DENIED:
+		      alert("User denied the request for Geolocation.")
+		      break
+		    case error.POSITION_UNAVAILABLE:
+		      alert("Location information is unavailable.")
+		      break
+		    case error.TIMEOUT:
+		      alert("The request to get user location timed out.")
+		      break
+		    case error.UNKNOWN_ERROR:
+		      alert("An unknown error occurred.")
+		      break
+		}
+	}
+
+	G.StartTrackPosition()
+
+	document.querySelector('#search').addEventListener('click', e => {
+
+		if(document.querySelector("#steps").value != ''){
             try{
-                // Меняем параметры поиска
-                P.Radius = C.CvtStepsToMeters(Number(document.querySelector("#steps").value))
-                P.Latitude  = G.CurrentPosition.lat
-                P.Longitude = G.CurrentPosition.lng
-                
-                // Вызов функции поиска
-                P.ShowPlaces()
+    			P.Radius = C.CvtStepsToMeters(Number(document.querySelector("#steps").value))
+    			P.Latitude  = G.CurrentPosition.lat
+    			P.Longitude = G.CurrentPosition.lng
+
+    			P.ShowPlaces()
             }catch(err){
                 console.log(err)
             }
-        }  
-    })
+		} 
+		
+	})
 
 }())
